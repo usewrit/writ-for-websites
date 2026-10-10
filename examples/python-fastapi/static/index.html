@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northwind Retail: Writ Bridge server example</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
+    main { max-width: 40rem; margin: 6rem auto 2rem; padding: 0 1rem; }
+    form { display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    label { display: grid; gap: 0.25rem; }
+    input { font: inherit; padding: 0.35rem 0.5rem; }
+    button { font: inherit; padding: 0.35rem 0.9rem; }
+    pre { padding: 1rem; border: 1px solid #8884; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Northwind Retail</h1>
+    <p>
+      The POS functions run on your computer, through Writ. The server checks every result
+      against the receipt Writ signed.
+    </p>
+
+    <h2>1. Your POS address</h2>
+    <form id="settings-form">
+      <label>Address on your network
+        <input name="pos_host" placeholder="192.168.1.20:8080" required autocomplete="off">
+      </label>
+      <button type="submit">Send to Writ</button>
+    </form>
+
+    <h2>2. Look up a product (the page calls, the server verifies)</h2>
+    <form id="lookup-form">
+      <label>SKU
+        <input name="sku" placeholder="A-100" autocomplete="off">
+      </label>
+      <button type="submit">Look up</button>
+    </form>
+
+    <h2>3. Receive a delivery (the server calls, through this page)</h2>
+    <form id="receive-form">
+      <label>Invoice number
+        <input name="invoice_no" placeholder="F-1029" required autocomplete="off">
+      </label>
+      <button type="submit">Receive</button>
+    </form>
+
+    <pre id="output" aria-live="polite">Looking for Writ on this computer...</pre>
+  </main>
+
+  <!-- The script-tag build of @usewrit/web. It defines window.WritWeb and nothing else. -->
+  <script src="https://cdn.jsdelivr.net/npm/@usewrit/web@0.2.0/dist/writ-web.iife.js"></script>
+  <script>
+    const output = document.getElementById("output");
+
+    function show(value) {
+      output.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    }
+
+    function report(error) {
+      if (WritWeb.isWritError(error)) show(error.code + ": " + error.message);
+      else show(String(error));
+    }
+
+    async function postJson(url, body) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return { status: response.status, body: await response.json() };
+    }
+
+    function field(form, name) {
+      return String(new FormData(form).get(name) || "").trim();
+    }
+
+    async function main() {
+      const [contract, session] = await Promise.all([
+        fetch("/writ-contract.json").then((response) => response.json()),
+        fetch("/api/session").then((response) => response.json()),
+      ]);
+
+      // With a userToken, this page also serves the server's calls for this user (the page
+      // channel at /writ-bridge, on this origin).
+      const writ = WritWeb.createWritBridge({
+        contract,
+        app: "Northwind Retail",
+        mode: "required",
+        endpoint: "/writ-bridge",
+        userToken: session.writToken,
+      });
+
+      writ.ready().then(() => show({ ready: true, status: writ.status() }), report);
+
+      document.getElementById("settings-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        try {
+          await writ.suggestSettings({ "pos.receive": { pos_host: field(event.target, "pos_host") } });
+          show("You confirmed the POS address in Writ's window. Every run now uses it.");
+        } catch (error) {
+          report(error);
+        }
+      });
+
+      // The page calls; the server mints the challenge first and verifies the receipt after.
+      document.getElementById("lookup-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const sku = field(event.target, "sku");
+        try {
+          const { body } = await postJson("/api/lookup/challenge", { sku });
+          show("Running on this computer...");
+          const { data, receipt } = await writ.pos.lookup({ sku }, { challenge: body.challenge });
+          const verdict = await postJson("/api/lookup/verify", { challenge: body.challenge, data, receipt });
+          show({ verifiedByServer: verdict.body });
+        } catch (error) {
+          report(error);
+        }
+      });
+
+      // The server calls; the bridge brings the command to this page, which runs it through Writ.
+      document.getElementById("receive-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        show("Asking the server...");
+        const { body } = await postJson("/api/receive", { invoice_no: field(event.target, "invoice_no") });
+        show(body);
+      });
+    }
+
+    main().catch(report);
+  </script>
+</body>
+</html>

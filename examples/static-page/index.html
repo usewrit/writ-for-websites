@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northwind Retail: Writ Bridge static page example</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
+    main { max-width: 40rem; margin: 6rem auto 2rem; padding: 0 1rem; }
+    form { display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    label { display: grid; gap: 0.25rem; }
+    input { font: inherit; padding: 0.35rem 0.5rem; }
+    button { font: inherit; padding: 0.35rem 0.9rem; }
+    pre { padding: 1rem; border: 1px solid #8884; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Northwind Retail</h1>
+    <p>
+      This page runs its POS functions on your computer, through the Writ extension and Writ
+      desktop. If anything is missing, the banner at the top of the page walks you through it.
+    </p>
+
+    <h2>1. Your POS address</h2>
+    <form id="settings-form">
+      <label>Address on your network
+        <input name="pos_host" placeholder="192.168.1.20:8080" required autocomplete="off">
+      </label>
+      <button type="submit">Send to Writ</button>
+    </form>
+
+    <h2>2. Look up a product</h2>
+    <form id="lookup-form">
+      <label>SKU
+        <input name="sku" placeholder="A-100" autocomplete="off">
+      </label>
+      <button type="submit">Look up</button>
+    </form>
+
+    <pre id="output" aria-live="polite">Looking for Writ on this computer...</pre>
+  </main>
+
+  <!-- The script-tag build of @usewrit/web. It defines window.WritWeb and nothing else. -->
+  <script src="https://cdn.jsdelivr.net/npm/@usewrit/web@0.2.0/dist/writ-web.iife.js"></script>
+  <script>
+    const output = document.getElementById("output");
+
+    function show(value) {
+      output.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    }
+
+    function report(error) {
+      if (WritWeb.isWritError(error)) show(error.code + ": " + error.message);
+      else show(String(error));
+    }
+
+    async function main() {
+      // Your own contract, exported from Writ desktop ("Add to your website") or `writ package export`.
+      const contract = await fetch("./writ-contract.json").then((response) => response.json());
+
+      // `required`: functions run only on the visitor's computer. The bridge shows its banner by
+      // itself until Writ is set up and the visitor installed and allowed the workflow.
+      const writ = WritWeb.createWritBridge({ contract, app: "Northwind Retail", mode: "required" });
+
+      writ.ready().then(
+        () => show({ ready: true, status: writ.status() }),
+        report,
+      );
+
+      // A setting: a value each visitor gives once. Writ's own window opens pre-filled, and the
+      // visitor confirms it there. This page can never pass it with a call.
+      document.getElementById("settings-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const pos_host = String(new FormData(event.target).get("pos_host") || "").trim();
+        try {
+          await writ.suggestSettings({ "pos.lookup": { pos_host } });
+          show("You confirmed the POS address in Writ's window. Every run now uses it.");
+        } catch (error) {
+          report(error);
+        }
+      });
+
+      // A call that runs on this computer. Without a server, nobody can check the receipt: see the
+      // node-express and python-fastapi examples for that.
+      document.getElementById("lookup-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const sku = String(new FormData(event.target).get("sku") || "").trim();
+        show("Running on this computer...");
+        try {
+          const result = await writ.pos.lookup(sku === "" ? {} : { sku });
+          show({
+            venue: result.venue,
+            data: result.data,
+            runId: result.runId,
+            receiptSignedBy: result.receipt ? result.receipt.device.kid : null,
+          });
+        } catch (error) {
+          report(error);
+        }
+      });
+    }
+
+    main().catch(report);
+  </script>
+</body>
+</html>

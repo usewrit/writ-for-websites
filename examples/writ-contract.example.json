@@ -1,0 +1,82 @@
+{
+  "format": "writ.contract/v1",
+  "generated_at": "2026-10-09T12:00:00Z",
+  "generator": "writ-desktop/1.0.8",
+  "publisher": { "name": "Northwind Retail" },
+  "functions": [
+    {
+      "key": "pos.receive",
+      "description": "Receive a supplier delivery in your POS",
+      "package": "northwind.pos",
+      "function": "receive",
+      "inputs": [{ "name": "invoice_no", "required": true, "description": "Supplier invoice number" }],
+      "outputs": ["received"],
+      "writes": true,
+      "local_network": [],
+      "settings": [
+        { "key": "pos_host", "label": "Your POS address", "kind": "lan_host" },
+        { "key": "store_no", "label": "Store number", "kind": "text" }
+      ]
+    },
+    {
+      "key": "pos.lookup",
+      "description": "Look up a product in your POS",
+      "package": "northwind.pos",
+      "function": "lookup",
+      "inputs": [{ "name": "sku", "required": false }],
+      "outputs": ["name", "price"],
+      "writes": false,
+      "local_network": [],
+      "settings": [
+        { "key": "pos_host", "label": "Your POS address", "kind": "lan_host" },
+        { "key": "store_no", "label": "Store number", "kind": "text" }
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "format": "writ.workflow/v1",
+      "id": "northwind.pos",
+      "version": "1.0.0",
+      "name": "Northwind POS",
+      "description": "Receives supplier deliveries and looks up products in the POS on your store network.",
+      "inputs": {
+        "invoice_no": { "description": "Supplier invoice number" },
+        "sku": { "required": false }
+      },
+      "credentials": [{ "key": "pos_password", "label": "POS password" }],
+      "settings": [
+        {
+          "key": "pos_host",
+          "label": "Your POS address",
+          "description": "On the POS: Settings, then Network",
+          "kind": "lan_host",
+          "example": "192.168.1.20:8080"
+        },
+        { "key": "store_no", "label": "Store number", "required": false }
+      ],
+      "steps": [
+        {
+          "type": "api_call",
+          "config": {
+            "function_name": "receive",
+            "method": "POST",
+            "url": "http://{{pos_host}}/api/receivings",
+            "headers": { "X-Pos-Password": "{{secret:pos_password}}" },
+            "body_json": { "invoice": "{{invoice_no}}", "store": "{{store_no}}" },
+            "side_effect": "write"
+          }
+        },
+        {
+          "type": "api_call",
+          "config": {
+            "function_name": "lookup",
+            "method": "GET",
+            "url": "http://{{pos_host}}/api/products?sku={{sku}}",
+            "headers": { "X-Pos-Password": "{{secret:pos_password}}" }
+          }
+        }
+      ]
+    }
+  ]
+}

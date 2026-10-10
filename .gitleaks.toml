@@ -1,0 +1,18 @@
+# gitleaks configuration. The publish pipeline runs `gitleaks detect --no-git` over this tree and
+# fails closed on any finding (gitleaks reads this file from the scanned directory). Each entry is
+# pinned to one file AND one exact literal (`condition = "AND"`), so a real secret landing in the
+# same file is still caught.
+
+title = "writ-bridge"
+
+[extend]
+useDefault = true
+
+# docs/contract.md, linked workflows: `writ-pub-test-2026` is the NAME (kid) of the test signing
+# key that only test builds trust. It is an identifier, not key material.
+[[allowlists]]
+description = "Publication signing key id (kid) of the test key, not a secret"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)docs/contract\.md$''']
+regexes = ['''^writ-pub-test-2026$''']
