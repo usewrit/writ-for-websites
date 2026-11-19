@@ -1,5 +1,8 @@
 <div align="center">
-  <img src="./assets/writ-tile-256.png" alt="Writ" width="96" height="96">
+  <a href="https://usewrit.app"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/cover-dark.png">
+    <img src="./assets/cover-light.png" alt="Writ for websites: run your website's workflows on each visitor's computer. usewrit.app" width="100%">
+  </picture></a>
 
   <h1>Writ for websites</h1>
 
@@ -7,6 +10,7 @@
   Your server checks every result against a receipt that Writ signed.</p>
 
   <p>
+    <a href="https://usewrit.app"><b>usewrit.app</b></a> ·
     <a href="./docs/quickstart.md"><b>Quickstart</b></a> ·
     <a href="./docs/how-it-works.md"><b>How it works</b></a> ·
     <a href="./docs/packages.md"><b>Shipping workflows</b></a> ·
