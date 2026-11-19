@@ -718,7 +718,7 @@ How Writ Cloud computes it from a published recipe (the engine's fit check reads
 - Writ Cloud signs with Ed25519. The key is named by `kid` (`writ-pub-<yyyy>-<nn>`).
 - The engine pins `kid → public key` in its binary. A test key, `writ-pub-test-2026`, is trusted
   only in test builds.
-- Development and self-hosting can add keys with `WRIT_PUBLICATION_KEYS=kid:base64,…`, set by the
+- Development builds can add keys with `WRIT_PUBLICATION_KEYS=kid:base64,…`, set by the
   machine's own user.
 - `sig` is base64url without padding. `public_key` in `/v1/pub/keys` is standard base64 of the raw
   32 bytes.
@@ -813,7 +813,7 @@ it. It is never stored by the extension or the engine.
 ### Engine rules for a linked package
 
 **Bases.** The engine only talks to allowed bases: `https://api.usewrit.app`, plus
-`WRIT_PUBLICATION_BASES` (comma-separated, for development and self-hosting).
+`WRIT_PUBLICATION_BASES` (comma-separated, for development).
 
 **Install.**
 1. Fetch the manifest; it must equal the contract's (`manifest_hash`).
